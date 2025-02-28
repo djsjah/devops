@@ -1,12 +1,27 @@
 version: '3.8'
 
 services:
-  nginx:
+  web:
     build: .
-    image: mynginx
     ports:
-      - "8080:8080"
+      - "8000:8000"
     volumes:
-      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./html:/usr/share/nginx/html:ro
-    restart: unless-stopped 
+      - ./django_project/static:/app/static
+    env_file:
+      - .env
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  db:
+    image: postgres:15-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    env_file:
+      - .env
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+volumes:
+  postgres_data: 

@@ -1,21 +1,32 @@
-FROM alpine:3.18
+FROM python:3.11-alpine
 
-RUN apk add --no-cache nginx && \
-    mkdir -p /tmp/nginx && \
-    chown -R nginx:nginx /tmp/nginx && \
-    mkdir -p /usr/share/nginx/html && \
-    chown -R nginx:nginx /usr/share/nginx/html
+RUN adduser -D appuser
 
-COPY config/nginx.conf /etc/nginx/nginx.conf
+RUN apk add --no-cache \
+    postgresql-dev \
+    gcc \
+    python3-dev \
+    musl-dev \
+    libffi-dev \
+    jpeg-dev \
+    zlib-dev && \
+    mkdir -p /app
 
-RUN mkdir -p /tmp && \
-    chown -R nginx:nginx /tmp && \
-    chmod -R 755 /tmp && \
-    chown -R nginx:nginx /var/lib/nginx && \
-    chmod -R 755 /var/lib/nginx
+WORKDIR /app
 
-USER nginx
+COPY django_project/ .
 
-EXPOSE 8080
+RUN pip install --no-cache-dir -r requirements.txt && \
+    apk del postgresql-dev gcc python3-dev musl-dev libffi-dev && \
+    apk add --no-cache postgresql-libs && \
+    rm -rf /var/cache/apk/*
 
-CMD ["nginx", "-g", "daemon off;"] 
+RUN mkdir -p /app/static && \
+    chown -R appuser:appuser /app
+
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+USER appuser
+
+CMD ["/app/entrypoint.sh"]

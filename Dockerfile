@@ -1,32 +1,32 @@
-FROM python:3.11-alpine
+FROM golang:1.20-alpine AS builder
 
-RUN adduser -D appuser
+RUN apk add --no-cache git && \
+    rm -rf /var/cache/apk/*
 
-RUN apk add --no-cache \
-    postgresql-dev \
-    gcc \
-    python3-dev \
-    musl-dev \
-    libffi-dev \
-    jpeg-dev \
-    zlib-dev && \
-    mkdir -p /app
+WORKDIR /src
+
+RUN git clone https://github.com/gin-gonic/examples.git
+
+WORKDIR /src/examples/basic
+
+RUN go mod init example/web && \
+    go get github.com/gin-gonic/gin && \
+    go mod tidy
+
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/server .
+
+FROM alpine:latest
+
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 WORKDIR /app
 
-COPY django_project/ .
+COPY --from=builder /app/server .
 
-RUN pip install --no-cache-dir -r requirements.txt && \
-    apk del postgresql-dev gcc python3-dev musl-dev libffi-dev && \
-    apk add --no-cache postgresql-libs && \
-    rm -rf /var/cache/apk/*
+RUN rm -rf /var/cache/apk/*
 
-RUN mkdir -p /app/static && \
-    chown -R appuser:appuser /app
-
-COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+EXPOSE 8080
 
 USER appuser
 
-CMD ["/app/entrypoint.sh"]
+CMD ["./server"]

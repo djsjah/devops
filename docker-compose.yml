@@ -1,10 +1,60 @@
 version: '3.8'
 
 services:
-  web:
-    build: .
+  db:
+    image: mysql:8.0
+    container_name: mysql
+    restart: always
     env_file:
       - .env
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - app-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: ./backend.Dockerfile
+    container_name: backend
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: ./frontend.Dockerfile
+    container_name: frontend
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - WDS_SOCKET_PORT=0
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
     ports:
-      - "${APP_PORT}:8080"
-    container_name: gin-web-app
+      - "29080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
